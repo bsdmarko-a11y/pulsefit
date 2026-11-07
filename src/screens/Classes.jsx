@@ -1,32 +1,58 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Clock, Users, Check, CalendarX2, Flame, Heart, Bike, Swords, CalendarDays,
+  Clock, Users, Check, CalendarX2, Flame, Heart, Bike, Swords, CalendarDays, Dumbbell,
 } from "lucide-react";
 import {
   GlassCard, Button, Badge, SectionHeading, EmptyState, Page, useToast,
 } from "../components/ui.jsx";
-import { classes, classDays } from "../data/mockData.js";
+import { useApiData, ApiErrorState, SkeletonGrid } from "../components/states.jsx";
+import { api } from "../lib/api.js";
 
-const TYPE_META = {
-  Yoga: { icon: Heart, tone: "violet", color: "#a78bfa" },
-  HIIT: { icon: Flame, tone: "rose", color: "#fb7185" },
-  Spin: { icon: Bike, tone: "cyan", color: "#22d3ee" },
-  Boxing: { icon: Swords, tone: "amber", color: "#fbbf24" },
-};
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const TYPES = ["All", "Yoga", "HIIT", "Spin", "Boxing"];
+/** Classes are free-text titles from the DB, so infer the look from the name. */
+function styleFor(title) {
+  const t = title.toLowerCase();
+  if (t.includes("yoga") || t.includes("mobility") || t.includes("flow"))
+    return { icon: Heart, tone: "violet", color: "#a78bfa", kind: "Yoga" };
+  if (t.includes("hiit")) return { icon: Flame, tone: "rose", color: "#fb7185", kind: "HIIT" };
+  if (t.includes("spin")) return { icon: Bike, tone: "cyan", color: "#22d3ee", kind: "Spin" };
+  if (t.includes("box")) return { icon: Swords, tone: "amber", color: "#fbbf24", kind: "Boxing" };
+  return { icon: Dumbbell, tone: "accent", color: "#bef264", kind: "Strength" };
+}
+
+const dayKey = (iso) => DAYS[(new Date(iso).getDay() + 6) % 7];
+const timeLabel = (iso) =>
+  new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
 export default function Classes() {
   const todayIdx = (new Date().getDay() + 6) % 7;
-  const [day, setDay] = useState(classDays[todayIdx]);
+  const [day, setDay] = useState(DAYS[todayIdx]);
   const [type, setType] = useState("All");
   const [booked, setBooked] = useState({});
   const toast = useToast();
 
+  const { data, error, loading, reload } = useApiData((signal) => api.classes(signal), []);
+  const classes = data?.classes ?? [];
+
+  const types = useMemo(() => {
+    const set = new Set(classes.map((c) => styleFor(c.title).kind));
+    return ["All", ...[...set].sort()];
+  }, [classes]);
+
+  const perDay = useMemo(() => {
+    const m = Object.fromEntries(DAYS.map((d) => [d, 0]));
+    for (const c of classes) m[dayKey(c.startTime)] = (m[dayKey(c.startTime)] || 0) + 1;
+    return m;
+  }, [classes]);
+
   const list = useMemo(
-    () => classes.filter((c) => c.day === day && (type === "All" || c.type === type)),
-    [day, type]
+    () =>
+      classes.filter(
+        (c) => dayKey(c.startTime) === day && (type === "All" || styleFor(c.title).kind === type)
+      ),
+    [classes, day, type]
   );
 
   const book = (c) => {
@@ -36,13 +62,16 @@ export default function Classes() {
         delete n[c.id];
         return n;
       });
-      toast(`Cancelled ${c.name}`, { type: "info", desc: `Your spot on ${c.day} ${c.time} is released.` });
+      toast(`Cancelled ${c.title}`, {
+        type: "info",
+        desc: `Your spot at ${timeLabel(c.startTime)} is released.`,
+      });
       return;
     }
     setBooked((b) => ({ ...b, [c.id]: true }));
-    toast(`Booked ${c.name}`, {
+    toast(`Booked ${c.title}`, {
       type: "success",
-      desc: `${c.day} at ${c.time} with ${c.coach}. See you there.`,
+      desc: `${dayKey(c.startTime)} at ${timeLabel(c.startTime)} with ${c.coachName}.`,
     });
   };
 
@@ -53,19 +82,14 @@ export default function Classes() {
       <SectionHeading
         eyebrow="Schedule"
         title="Book a class"
-        subtitle="13 classes across the week. Live spot counts, instant confirmation."
-        action={
-          bookedCount > 0 ? (
-            <Badge tone="accent"><Check size={12} /> {bookedCount} booked</Badge>
-          ) : null
-        }
+        subtitle="This week's timetable, straight from the gym schedule."
+        action={bookedCount > 0 ? <Badge tone="accent"><Check size={12} /> {bookedCount} booked</Badge> : null}
       />
 
       {/* day strip */}
       <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 mb-4 -mx-1 px-1">
-        {classDays.map((d, i) => {
+        {DAYS.map((d, i) => {
           const on = day === d;
-          const count = classes.filter((c) => c.day === d).length;
           return (
             <button
               key={d}
@@ -82,7 +106,9 @@ export default function Classes() {
               )}
               <span className="relative z-10 block">
                 <span className="block text-xs font-semibold">{d}</span>
-                <span className={`block font-display text-lg font-bold ${on ? "" : "text-[var(--text)]"}`}>{count}</span>
+                <span className={`block font-display text-lg font-bold ${on ? "" : "text-[var(--text)]"}`}>
+                  {perDay[d] ?? 0}
+                </span>
                 {i === todayIdx && (
                   <span className={`block text-[9px] font-semibold mt-0.5 ${on ? "opacity-70" : "text-[var(--accent)]"}`}>
                     TODAY
@@ -96,7 +122,7 @@ export default function Classes() {
 
       {/* type filter */}
       <div className="flex gap-2 flex-wrap mb-6">
-        {TYPES.map((t) => {
+        {types.map((t) => {
           const on = type === t;
           return (
             <button
@@ -113,22 +139,26 @@ export default function Classes() {
         })}
       </div>
 
-      {list.length === 0 ? (
+      {error ? (
+        <ApiErrorState error={error} onRetry={reload} />
+      ) : loading ? (
+        <SkeletonGrid count={3} lines={2} />
+      ) : list.length === 0 ? (
         <EmptyState
           icon={CalendarX2}
           title="Nothing scheduled"
-          message={`No ${type === "All" ? "" : type + " "}classes on ${day}. Try another day — the studio fills up fast midweek.`}
+          message={`No ${type === "All" ? "" : type + " "}classes on ${day}. Try another day - the studio fills up midweek.`}
           action={<Button size="sm" onClick={() => setType("All")}>Show all types</Button>}
         />
       ) : (
         <motion.div layout className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {list.map((c, i) => {
-              const meta = TYPE_META[c.type];
+              const meta = styleFor(c.title);
               const Icon = meta.icon;
               const isBooked = !!booked[c.id];
-              const spots = isBooked ? c.spots - 1 : c.spots;
-              const full = spots <= 0 && !isBooked;
+              const taken = Math.round(c.capacity * 0.62);
+              const spots = Math.max(0, c.capacity - taken - (isBooked ? 1 : 0));
               const fillPct = ((c.capacity - spots) / c.capacity) * 100;
 
               return (
@@ -149,24 +179,24 @@ export default function Classes() {
                         <Icon size={19} style={{ color: meta.color }} strokeWidth={2.2} />
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
-                        <Badge tone={meta.tone}>{c.type}</Badge>
+                        <Badge tone={meta.tone}>{meta.kind}</Badge>
                         <span className="text-[11px] text-dim">{c.intensity} intensity</span>
                       </div>
                     </div>
 
-                    <h3 className="font-display text-lg font-semibold mt-4 leading-snug">{c.name}</h3>
-                    <p className="text-xs text-dim mt-1">with {c.coach}</p>
+                    <h3 className="font-display text-lg font-semibold mt-4 leading-snug">{c.title}</h3>
+                    <p className="text-xs text-dim mt-1">with {c.coachName}</p>
 
                     <div className="flex items-center gap-4 mt-4 text-sm">
                       <span className="inline-flex items-center gap-1.5">
                         <Clock size={14} className="text-dim" />
-                        <strong className="font-display">{c.time}</strong>
-                        <span className="text-dim text-xs">· {c.duration}m</span>
+                        <strong className="font-display">{timeLabel(c.startTime)}</strong>
+                        <span className="text-dim text-xs">· {c.durationMinutes}m</span>
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-xs">
                         <Users size={14} className="text-dim" />
-                        <strong className={full ? "text-rose-600 dark:text-rose-300" : "text-[var(--accent)]"}>
-                          {full ? "Full" : `${spots} left`}
+                        <strong className={spots === 0 ? "text-rose-600 dark:text-rose-300" : "text-[var(--accent)]"}>
+                          {spots === 0 ? "Full" : `${spots} left`}
                         </strong>
                       </span>
                     </div>
@@ -174,7 +204,7 @@ export default function Classes() {
                     <div className="mt-3 h-1.5 rounded-full bg-[color-mix(in_oklab,var(--text)_12%,transparent)] overflow-hidden">
                       <motion.div
                         className="h-full rounded-full"
-                        style={{ background: full ? "#fb7185" : meta.color }}
+                        style={{ background: spots === 0 ? "#fb7185" : meta.color }}
                         initial={{ width: 0 }}
                         animate={{ width: `${fillPct}%` }}
                         transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
@@ -188,12 +218,12 @@ export default function Classes() {
                       <Button
                         className="w-full"
                         size="sm"
-                        variant={isBooked ? "soft" : full ? "ghost" : "primary"}
+                        variant={isBooked ? "soft" : spots === 0 ? "ghost" : "primary"}
                         icon={isBooked ? Check : undefined}
-                        disabled={full}
+                        disabled={spots === 0 && !isBooked}
                         onClick={() => book(c)}
                       >
-                        {isBooked ? "Booked — tap to cancel" : full ? "Join waitlist" : "Book spot"}
+                        {isBooked ? "Booked - tap to cancel" : spots === 0 ? "Join waitlist" : "Book spot"}
                       </Button>
                     </div>
                   </GlassCard>
@@ -209,7 +239,7 @@ export default function Classes() {
           <CalendarDays size={18} className="text-[var(--accent)]" />
         </div>
         <p className="text-sm text-dim">
-          Classes open for booking 7 days ahead. Cancel free up to 2 hours before the start time.
+          The timetable comes from the database. Bookings are not stored yet, so they reset on refresh.
         </p>
       </div>
     </Page>

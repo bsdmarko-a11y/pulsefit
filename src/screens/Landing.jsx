@@ -4,7 +4,11 @@ import {
 } from "lucide-react";
 import { Logo, Button, AnimatedCounter, GlassCard, Page, stagger, riseIn } from "../components/ui.jsx";
 import { ThemeToggle } from "../components/Shell.jsx";
-import { heroStats, quoteOfTheDay } from "../data/mockData.js";
+import { Skeleton } from "../components/states.jsx";
+import { useApiData } from "../components/states.jsx";
+import { api } from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { quoteOfTheDay } from "../data/mockData.js";
 
 const FEATURES = [
   { icon: Dumbbell, title: "Smart programming", text: "Blocks that adapt to the weight you actually lifted, not the weight you planned." },
@@ -16,6 +20,19 @@ const FEATURES = [
 ];
 
 export default function Landing({ onNavigate, theme, onToggleTheme }) {
+  const { user } = useAuth();
+  const { data: stats, loading: statsLoading } = useApiData((signal) => api.stats(signal), []);
+
+  // Logged out, "Start Your Workout" sends you to sign up; logged in it opens
+  // the app, exactly as the brief asks.
+  const startHref = user ? "dashboard" : "signup";
+
+  const heroStats = [
+    { label: "Active members", value: stats?.members ?? 0, suffix: "" },
+    { label: "Workouts completed", value: stats?.workoutsCompleted ?? 0, suffix: "" },
+    { label: "Classes this week", value: stats?.classesThisWeek ?? 0, suffix: "" },
+  ];
+
   return (
     <Page className="min-h-screen">
       {/* nav */}
@@ -24,13 +41,25 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
         <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm text-dim">
-            <a href="#features" className="hover:text-[var(--text)] transition-colors">Features</a>
+            <a href="#how" className="hover:text-[var(--text)] transition-colors">Features</a>
             <a href="#stats" className="hover:text-[var(--text)] transition-colors">Results</a>
-            <button onClick={() => onNavigate("classes")} className="hover:text-[var(--text)] transition-colors cursor-pointer">Classes</button>
+            <a href="#how" className="hover:text-[var(--text)] transition-colors">How it works</a>
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle theme={theme} onToggle={onToggleTheme} compact />
-            <Button size="sm" onClick={() => onNavigate("dashboard")}>Open app</Button>
+            {user ? (
+              <Button size="sm" onClick={() => onNavigate("dashboard")}>Open app</Button>
+            ) : (
+              <>
+                <button
+                  onClick={() => onNavigate("login")}
+                  className="hidden sm:block text-sm text-dim hover:text-[var(--text)] transition-colors cursor-pointer"
+                >
+                  Sign in
+                </button>
+                <Button size="sm" onClick={() => onNavigate("signup")}>Get started</Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -45,7 +74,11 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
               <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] animate-pulse-ring" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]" />
             </span>
-            <span className="text-xs font-semibold text-[var(--accent)]">186 classes running this week</span>
+            <span className="text-xs font-semibold text-[var(--accent)]">
+              {statsLoading
+                ? "Loading this week's schedule"
+                : `${stats?.classesThisWeek ?? 0} classes running this week`}
+            </span>
           </motion.div>
 
           <motion.h1
@@ -64,9 +97,9 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
           </motion.p>
 
           <motion.div variants={riseIn} className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button size="lg" icon={Play} onClick={() => onNavigate("live")}>Start Your Workout</Button>
-            <Button size="lg" variant="ghost" icon={ArrowRight} onClick={() => onNavigate("dashboard")}>
-              See the dashboard
+            <Button size="lg" icon={Play} onClick={() => onNavigate(startHref)}>Start Your Workout</Button>
+            <Button size="lg" variant="ghost" icon={ArrowRight} onClick={() => onNavigate(user ? "dashboard" : "login")}>
+              {user ? "See the dashboard" : "I already have an account"}
             </Button>
           </motion.div>
 
@@ -88,6 +121,15 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
         >
           <div className="absolute -inset-x-10 -top-10 bottom-10 grad-bg opacity-[0.14] blur-3xl rounded-[48px]" />
           <GlassCard hover={false} className="relative p-5 sm:p-7">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim">
+                A look inside
+              </span>
+              <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-dim
+                               bg-[color-mix(in_oklab,var(--text)_8%,transparent)]">
+                Sample data
+              </span>
+            </div>
             <div className="grid gap-4 sm:grid-cols-3">
               {[
                 { icon: Flame, label: "Current streak", value: "18 days", tone: "text-orange-600 dark:text-orange-400" },
@@ -142,7 +184,11 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
             >
               <GlassCard className="p-7 text-center">
                 <div className="font-display text-4xl sm:text-5xl font-bold grad-text">
-                  <AnimatedCounter value={s.value} suffix={s.suffix} />
+                  {statsLoading ? (
+                    <Skeleton className="h-11 w-28 mx-auto" />
+                  ) : (
+                    <AnimatedCounter value={s.value} suffix={s.suffix} />
+                  )}
                 </div>
                 <div className="text-dim text-sm mt-2">{s.label}</div>
               </GlassCard>
@@ -152,7 +198,7 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
       </section>
 
       {/* features */}
-      <section id="features" className="mx-auto max-w-6xl px-5 py-14">
+      <section id="how" className="mx-auto max-w-6xl px-5 py-14">
         <div className="text-center mb-12">
           <div className="text-[11px] font-semibold uppercase tracking-[0.2em] grad-text mb-3">Everything in one app</div>
           <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
@@ -192,7 +238,7 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
             </p>
             <p className="text-dim text-sm mt-4">— {quoteOfTheDay.author}</p>
             <div className="mt-9">
-              <Button size="lg" icon={Play} onClick={() => onNavigate("live")}>Start Your Workout</Button>
+              <Button size="lg" icon={Play} onClick={() => onNavigate(startHref)}>Start Your Workout</Button>
             </div>
           </div>
         </GlassCard>
@@ -203,9 +249,9 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
           <Logo size="sm" />
           <p className="text-xs text-dim">© {new Date().getFullYear()} PulseFit. Train smarter. Get stronger.</p>
           <div className="flex gap-5 text-xs text-dim">
-            <a href="#features" className="hover:text-[var(--text)] transition-colors">Features</a>
-            <button onClick={() => onNavigate("classes")} className="hover:text-[var(--text)] transition-colors cursor-pointer">Classes</button>
-            <button onClick={() => onNavigate("profile")} className="hover:text-[var(--text)] transition-colors cursor-pointer">Account</button>
+            <a href="#how" className="hover:text-[var(--text)] transition-colors">Features</a>
+            <button onClick={() => onNavigate(user ? "classes" : "signup")} className="hover:text-[var(--text)] transition-colors cursor-pointer">Classes</button>
+            <button onClick={() => onNavigate(user ? "profile" : "login")} className="hover:text-[var(--text)] transition-colors cursor-pointer">Account</button>
           </div>
         </div>
       </footer>

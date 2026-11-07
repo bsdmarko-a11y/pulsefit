@@ -138,3 +138,8 @@ body::before {
 }
 
 ::selection { background: color-mix(in oklab, var(--accent) 40%, transparent); color: var(--text); }
+
+@keyframes skeleton-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}

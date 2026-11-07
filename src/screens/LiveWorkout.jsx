@@ -2,12 +2,16 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import {
-  Play, Pause, RotateCcw, Check, SkipForward, Timer, Flame, Trophy, Zap, X, Dumbbell,
+  Play, Pause, RotateCcw, Check, SkipForward, Timer, Flame, Trophy, X,
+  Dumbbell, CalendarPlus, Plus, Loader2, Trash2,
 } from "lucide-react";
-import { GlassCard, Button, Badge, SectionHeading, Page, useToast } from "../components/ui.jsx";
-import { todaysWorkout } from "../data/mockData.js";
+import {
+  GlassCard, Button, Badge, SectionHeading, EmptyState, Page, useToast,
+} from "../components/ui.jsx";
+import { useApiData, ApiErrorState, Skeleton } from "../components/states.jsx";
+import { api } from "../lib/api.js";
 
-const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, "0")}`;
 
 function fireConfetti() {
   const base = { spread: 80, ticks: 180, gravity: 0.9, scalar: 1.05, zIndex: 200 };
@@ -19,38 +23,50 @@ function fireConfetti() {
 
 export default function LiveWorkout({ onNavigate }) {
   const toast = useToast();
-
-  const [done, setDone] = useState(() =>
-    Object.fromEntries(todaysWorkout.exercises.map((e) => [e.id, Array(e.sets).fill(false)]))
+  const { data, error, loading, reload, setData } = useApiData(
+    (signal) => api.todaysWorkout(signal),
+    []
   );
+  const workout = data?.workout ?? null;
+
   const [rest, setRest] = useState(0);
   const [restTotal, setRestTotal] = useState(90);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [complete, setComplete] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [pending, setPending] = useState(() => new Set());
   const celebrated = useRef(false);
 
-  const totalSets = todaysWorkout.exercises.reduce((s, e) => s + e.sets, 0);
-  const doneSets = useMemo(
-    () => Object.values(done).flat().filter(Boolean).length,
-    [done]
+  const totalSets = useMemo(
+    () => workout?.exercises.reduce((s, e) => s + e.sets.length, 0) ?? 0,
+    [workout]
   );
-  const pct = doneSets / totalSets;
+  const doneSets = useMemo(
+    () => workout?.exercises.reduce((s, e) => s + e.sets.filter((x) => x.completed).length, 0) ?? 0,
+    [workout]
+  );
+  const pct = totalSets ? doneSets / totalSets : 0;
 
-  /* session clock */
+  /* Session clock starts from whatever the server recorded, so a refresh
+     mid-workout does not reset the elapsed time. */
   useEffect(() => {
-    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    if (!workout?.startedAt || workout.status === "completed") return;
+    const startedMs = new Date(workout.startedAt).getTime();
+    const tick = () => setElapsed(Math.max(0, Math.round((Date.now() - startedMs) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [workout?.startedAt, workout?.status]);
 
-  /* rest timer */
+  /* Rest countdown */
   useEffect(() => {
     if (!running || rest <= 0) return;
     const id = setInterval(() => {
       setRest((r) => {
         if (r <= 1) {
           setRunning(false);
-          toast("Rest over — next set", { type: "info" });
+          toast("Rest over - next set", { type: "info" });
           return 0;
         }
         return r - 1;
@@ -59,56 +75,167 @@ export default function LiveWorkout({ onNavigate }) {
     return () => clearInterval(id);
   }, [running, rest, toast]);
 
-  /* completion */
-  useEffect(() => {
-    if (doneSets === totalSets && !celebrated.current) {
-      celebrated.current = true;
-      setComplete(true);
-      setRunning(false);
-      fireConfetti();
-    }
-  }, [doneSets, totalSets]);
+  /** Optimistic: flip the set immediately, roll back if the save fails. */
+  const toggleSet = useCallback(
+    async (exercise, set) => {
+      if (pending.has(set.id) || workout?.status === "completed") return;
+      const next = !set.completed;
 
-  const toggleSet = useCallback((exId, idx, restSec) => {
-    setDone((d) => {
-      const next = { ...d, [exId]: d[exId].map((v, i) => (i === idx ? !v : v)) };
-      if (!d[exId][idx]) {
-        setRestTotal(restSec);
-        setRest(restSec);
-        setRunning(true);
+      setData((d) => ({
+        ...d,
+        workout: {
+          ...d.workout,
+          exercises: d.workout.exercises.map((ex) =>
+            ex.workoutExerciseId !== exercise.workoutExerciseId
+              ? ex
+              : { ...ex, sets: ex.sets.map((s) => (s.id === set.id ? { ...s, completed: next } : s)) }
+          ),
+        },
+      }));
+
+      if (next) {
+        setRestTotal(exercise.restSeconds);
+        setRest(exercise.restSeconds);
+        setRunning(exercise.restSeconds > 0);
       }
-      return next;
-    });
-  }, []);
 
-  const resetAll = () => {
-    setDone(Object.fromEntries(todaysWorkout.exercises.map((e) => [e.id, Array(e.sets).fill(false)])));
-    setRest(0);
+      setPending((p) => new Set(p).add(set.id));
+
+      try {
+        if (workout.status === "planned") {
+          await api.startWorkout(workout.id);
+          setData((d) => ({ ...d, workout: { ...d.workout, status: "in_progress" } }));
+        }
+        await api.toggleSet(set.id, next);
+      } catch (err) {
+        // Roll back the optimistic flip.
+        setData((d) => ({
+          ...d,
+          workout: {
+            ...d.workout,
+            exercises: d.workout.exercises.map((ex) =>
+              ex.workoutExerciseId !== exercise.workoutExerciseId
+                ? ex
+                : { ...ex, sets: ex.sets.map((s) => (s.id === set.id ? { ...s, completed: !next } : s)) }
+            ),
+          },
+        }));
+        toast("Could not save that set", { type: "error", desc: err.message });
+      } finally {
+        setPending((p) => {
+          const n = new Set(p);
+          n.delete(set.id);
+          return n;
+        });
+      }
+    },
+    [workout, pending, setData, toast]
+  );
+
+  /* Finish: persist duration + completed status, then celebrate. */
+  useEffect(() => {
+    if (!workout || totalSets === 0) return;
+    if (doneSets !== totalSets) return;
+    if (workout.status === "completed" || celebrated.current || finishing) return;
+
+    celebrated.current = true;
+    setFinishing(true);
     setRunning(false);
-    setElapsed(0);
-    setComplete(false);
-    celebrated.current = false;
-    toast("Session reset", { type: "info" });
+
+    const minutes = Math.max(1, Math.round(elapsed / 60));
+    api
+      .completeWorkout(workout.id, minutes)
+      .then(({ workout: saved }) => {
+        setData((d) => ({ ...d, workout: saved }));
+        setCelebrate(true);
+        fireConfetti();
+      })
+      .catch((err) => {
+        celebrated.current = false;
+        toast("Could not save the finish", { type: "error", desc: err.message });
+      })
+      .finally(() => setFinishing(false));
+  }, [doneSets, totalSets, workout, elapsed, finishing, setData, toast]);
+
+  const removeExercise = async (ex) => {
+    try {
+      const { workout: updated } = await api.removeExercise(ex.workoutExerciseId);
+      setData((d) => ({ ...d, workout: updated }));
+      celebrated.current = false;
+      toast(`${ex.name} removed`, { type: "info" });
+    } catch (err) {
+      toast("Could not remove that", { type: "error", desc: err.message });
+    }
   };
+
+  /* ------------------------------------------------------------ rendering */
+
+  if (error) {
+    return (
+      <Page>
+        <ApiErrorState error={error} onRetry={reload} />
+      </Page>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Page>
+        <Skeleton className="h-8 w-64 mb-6" />
+        <div className="grid gap-5 lg:grid-cols-5">
+          <div className="lg:col-span-2 space-y-5">
+            <GlassCard hover={false} className="p-7 grid place-items-center">
+              <Skeleton className="h-[200px] w-[200px]" rounded="rounded-full" />
+            </GlassCard>
+            <GlassCard hover={false} className="p-5">
+              <Skeleton className="h-4 w-full" />
+            </GlassCard>
+          </div>
+          <div className="lg:col-span-3 space-y-3">
+            {[0, 1, 2].map((i) => (
+              <GlassCard key={i} hover={false} className="p-5">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-11 w-full mt-4" />
+              </GlassCard>
+            ))}
+          </div>
+        </div>
+      </Page>
+    );
+  }
+
+  if (!workout || workout.exercises.length === 0) {
+    return (
+      <Page>
+        <SectionHeading eyebrow="Live" title="Live workout" />
+        <EmptyState
+          icon={CalendarPlus}
+          title="No workout yet today"
+          message="Pick exercises from the Library and they will appear here with their sets and rest timers ready."
+          action={
+            <Button icon={Plus} onClick={() => onNavigate("library")}>
+              Pick from the Library
+            </Button>
+          }
+        />
+      </Page>
+    );
+  }
 
   const R = 86;
   const C = 2 * Math.PI * R;
   const restPct = restTotal ? rest / restTotal : 0;
-
-  const volume = todaysWorkout.exercises.reduce(
-    (sum, e) => sum + done[e.id].filter(Boolean).length * e.reps * e.weight,
-    0
-  );
+  const isComplete = workout.status === "completed";
 
   return (
     <Page>
       <SectionHeading
         eyebrow="Live"
-        title={todaysWorkout.title}
-        subtitle={todaysWorkout.focus}
+        title={workout.name}
+        subtitle={`${workout.exercises.length} exercises · ${totalSets} sets`}
         action={
-          <Button variant="ghost" size="sm" icon={RotateCcw} onClick={resetAll}>
-            Reset
+          <Button variant="ghost" size="sm" icon={RotateCcw} onClick={reload}>
+            Refresh
           </Button>
         }
       />
@@ -201,9 +328,14 @@ export default function LiveWorkout({ onNavigate }) {
             </div>
             <div className="grid grid-cols-3 gap-3 mt-5">
               {[
-                { icon: Timer, label: "Elapsed", value: fmt(elapsed), tone: "text-cyan-700 dark:text-cyan-300" },
-                { icon: Dumbbell, label: "Volume", value: `${(volume / 1000).toFixed(1)}t`, tone: "text-[var(--accent)]" },
-                { icon: Zap, label: "Burned", value: `${Math.round(todaysWorkout.kcal * pct)}`, tone: "text-amber-600 dark:text-amber-300" },
+                {
+                  icon: Timer,
+                  label: isComplete ? "Logged" : "Elapsed",
+                  value: isComplete ? `${workout.durationMinutes}m` : fmt(elapsed),
+                  tone: "text-cyan-700 dark:text-cyan-300",
+                },
+                { icon: Dumbbell, label: "Exercises", value: workout.exercises.length, tone: "text-[var(--accent)]" },
+                { icon: Check, label: "Sets done", value: doneSets, tone: "text-amber-600 dark:text-amber-300" },
               ].map(({ icon: Icon, label, value, tone }) => (
                 <div key={label} className="rounded-xl p-3 text-center bg-[color-mix(in_oklab,var(--text)_6%,transparent)]">
                   <Icon size={15} className={`mx-auto ${tone}`} />
@@ -212,17 +344,24 @@ export default function LiveWorkout({ onNavigate }) {
                 </div>
               ))}
             </div>
+
+            {isComplete && (
+              <div className="mt-4 rounded-xl px-3.5 py-2.5 text-xs text-center
+                              bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]
+                              border border-[color-mix(in_oklab,var(--accent)_30%,transparent)]">
+                Session saved. Come back tomorrow for the next one.
+              </div>
+            )}
           </GlassCard>
         </div>
 
         {/* exercise list */}
         <div className="lg:col-span-3 space-y-3">
-          {todaysWorkout.exercises.map((ex, i) => {
-            const sets = done[ex.id];
-            const finished = sets.every(Boolean);
+          {workout.exercises.map((ex, i) => {
+            const finished = ex.sets.length > 0 && ex.sets.every((s) => s.completed);
             return (
               <motion.div
-                key={ex.id}
+                key={ex.workoutExerciseId}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06, duration: 0.45 }}
@@ -234,56 +373,88 @@ export default function LiveWorkout({ onNavigate }) {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-display text-xs font-bold text-dim">{String(i + 1).padStart(2, "0")}</span>
+                        <span className="font-display text-xs font-bold text-dim">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
                         <h3 className={`font-display text-lg font-semibold truncate ${finished ? "text-[var(--accent)]" : ""}`}>
                           {ex.name}
                         </h3>
                       </div>
                       <p className="text-xs text-dim mt-1">
-                        {ex.sets} × {ex.reps} @ {ex.weight} kg · {ex.rest}s rest
+                        {ex.sets.length} × {ex.reps} · {ex.restSeconds}s rest · {ex.muscleGroup}
                       </p>
                     </div>
-                    {finished && (
-                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 20 }}>
-                        <Badge tone="accent"><Check size={12} /> Done</Badge>
-                      </motion.div>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {finished && (
+                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+                                    transition={{ type: "spring", stiffness: 500, damping: 20 }}>
+                          <Badge tone="accent"><Check size={12} /> Done</Badge>
+                        </motion.div>
+                      )}
+                      {!isComplete && (
+                        <button
+                          onClick={() => removeExercise(ex)}
+                          aria-label={`Remove ${ex.name}`}
+                          className="grid place-items-center h-8 w-8 rounded-lg text-dim transition-colors cursor-pointer
+                                     hover:text-rose-600 dark:hover:text-rose-300
+                                     bg-[color-mix(in_oklab,var(--text)_6%,transparent)]"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mt-4">
-                    {sets.map((on, idx) => (
-                      <motion.button
-                        key={idx}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => toggleSet(ex.id, idx, ex.rest)}
-                        className={`relative h-11 min-w-[70px] rounded-xl px-3 text-sm font-semibold transition-all cursor-pointer
-                          ${on
-                            ? "grad-bg text-[#07090d] shadow-[0_8px_24px_-10px_color-mix(in_oklab,var(--accent)_85%,transparent)]"
-                            : "bg-[color-mix(in_oklab,var(--text)_7%,transparent)] text-dim hover:text-[var(--text)] border border-[color-mix(in_oklab,var(--text)_10%,transparent)]"}`}
-                      >
-                        <span className="flex items-center justify-center gap-1.5">
-                          {on ? <Check size={14} strokeWidth={3} /> : null}
-                          Set {idx + 1}
-                        </span>
-                      </motion.button>
-                    ))}
+                    {ex.sets.map((set, idx) => {
+                      const busy = pending.has(set.id);
+                      return (
+                        <motion.button
+                          key={set.id}
+                          whileTap={{ scale: 0.9 }}
+                          disabled={isComplete}
+                          onClick={() => toggleSet(ex, set)}
+                          className={`relative h-11 min-w-[70px] rounded-xl px-3 text-sm font-semibold transition-all cursor-pointer
+                            disabled:cursor-default
+                            ${set.completed
+                              ? "grad-bg text-[#07090d] shadow-[0_8px_24px_-10px_color-mix(in_oklab,var(--accent)_85%,transparent)]"
+                              : "bg-[color-mix(in_oklab,var(--text)_7%,transparent)] text-dim hover:text-[var(--text)] border border-[color-mix(in_oklab,var(--text)_10%,transparent)]"}
+                            ${busy ? "opacity-70" : ""}`}
+                        >
+                          <span className="flex items-center justify-center gap-1.5">
+                            {busy ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : set.completed ? (
+                              <Check size={14} strokeWidth={3} />
+                            ) : null}
+                            Set {idx + 1}
+                          </span>
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </GlassCard>
               </motion.div>
             );
           })}
+
+          <div className="pt-2">
+            <Button variant="ghost" className="w-full" icon={Plus} onClick={() => onNavigate("library")}>
+              Add another exercise
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* completion overlay */}
       <AnimatePresence>
-        {complete && (
+        {celebrate && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] grid place-items-center p-5 bg-black/65 backdrop-blur-md"
-            onClick={() => setComplete(false)}
+            onClick={() => setCelebrate(false)}
           >
             <motion.div
               initial={{ scale: 0.88, y: 30, opacity: 0 }}
@@ -294,7 +465,7 @@ export default function LiveWorkout({ onNavigate }) {
               className="glass rounded-3xl p-8 sm:p-10 w-full max-w-md text-center relative"
             >
               <button
-                onClick={() => setComplete(false)}
+                onClick={() => setCelebrate(false)}
                 className="absolute top-4 right-4 text-dim hover:text-[var(--text)] transition-colors cursor-pointer"
                 aria-label="Close"
               >
@@ -311,14 +482,14 @@ export default function LiveWorkout({ onNavigate }) {
 
               <h2 className="font-display text-3xl font-bold mt-6">Workout complete</h2>
               <p className="text-dim text-sm mt-2">
-                {todaysWorkout.title} — every set logged. That is {doneSets} sets in {fmt(elapsed)}.
+                {workout.name} — all {totalSets} sets logged and saved.
               </p>
 
               <div className="grid grid-cols-3 gap-3 mt-7">
                 {[
-                  { icon: Timer, v: fmt(elapsed), l: "Duration" },
-                  { icon: Flame, v: todaysWorkout.kcal, l: "kcal" },
-                  { icon: Dumbbell, v: `${(volume / 1000).toFixed(1)}t`, l: "Volume" },
+                  { icon: Timer, v: `${workout.durationMinutes ?? Math.max(1, Math.round(elapsed / 60))}m`, l: "Duration" },
+                  { icon: Check, v: totalSets, l: "Sets" },
+                  { icon: Flame, v: workout.exercises.length, l: "Exercises" },
                 ].map(({ icon: Icon, v, l }) => (
                   <div key={l} className="rounded-xl p-3 bg-[color-mix(in_oklab,var(--text)_7%,transparent)]">
                     <Icon size={15} className="mx-auto text-[var(--accent)]" />
@@ -329,10 +500,10 @@ export default function LiveWorkout({ onNavigate }) {
               </div>
 
               <div className="flex gap-3 mt-7">
-                <Button className="flex-1" onClick={() => { setComplete(false); onNavigate("progress"); }}>
-                  See progress
+                <Button className="flex-1" onClick={() => { setCelebrate(false); onNavigate("dashboard"); }}>
+                  See dashboard
                 </Button>
-                <Button variant="ghost" className="flex-1" onClick={() => { setComplete(false); fireConfetti(); }}>
+                <Button variant="ghost" className="flex-1" onClick={() => { setCelebrate(false); fireConfetti(); }}>
                   Again!
                 </Button>
               </div>

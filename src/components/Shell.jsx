@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, Dumbbell, Timer, TrendingUp, CalendarDays, User,
-  Sparkles, Sun, Moon, Flame,
+  Sun, Moon, LogOut,
 } from "lucide-react";
-import { Logo } from "./ui.jsx";
-import { user } from "../data/mockData.js";
+import { Logo, useToast } from "./ui.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,6 +14,12 @@ export const NAV = [
   { key: "classes", label: "Classes", icon: CalendarDays },
   { key: "profile", label: "Profile", icon: User },
 ];
+
+export function initialsOf(name = "") {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "PF";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 /* ------------------------------------------------------------ ThemeToggle */
 
@@ -42,11 +48,20 @@ export function ThemeToggle({ theme, onToggle, compact = false }) {
 /* ---------------------------------------------------------------- Sidebar */
 
 export function Sidebar({ active, onNavigate, theme, onToggleTheme }) {
+  const { user, logout } = useAuth();
+  const toast = useToast();
+
+  const signOut = async () => {
+    await logout();
+    toast("Signed out", { type: "info", desc: "See you at the next session." });
+    onNavigate("landing");
+  };
+
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 z-40 h-screen w-[244px] flex-col gap-2 p-5
                       border-r border-[color-mix(in_oklab,var(--text)_9%,transparent)]
                       bg-[color-mix(in_oklab,var(--bg)_72%,transparent)] backdrop-blur-xl">
-      <button onClick={() => onNavigate("landing")} className="mb-6 text-left cursor-pointer">
+      <button onClick={() => onNavigate("dashboard")} className="mb-6 text-left cursor-pointer">
         <Logo />
       </button>
 
@@ -78,20 +93,24 @@ export function Sidebar({ active, onNavigate, theme, onToggleTheme }) {
 
       <div className="mt-auto flex flex-col gap-4">
         <div className="glass rounded-2xl p-4">
-          <div className="flex items-center gap-2 text-[var(--accent)]">
-            <Flame size={17} strokeWidth={2.4} />
-            <span className="font-display font-bold text-lg">{user.streak}</span>
-            <span className="text-xs text-dim font-medium">day streak</span>
+          <div className="flex items-center gap-3">
+            <div className="grid place-items-center h-9 w-9 rounded-xl grad-bg shrink-0
+                            font-display text-xs font-bold text-[#07090d]">
+              {initialsOf(user?.fullName)}
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold truncate">{user?.fullName || "Athlete"}</div>
+              <div className="text-[11px] text-dim truncate">{user?.email}</div>
+            </div>
           </div>
-          <div className="mt-3 h-1.5 rounded-full bg-[color-mix(in_oklab,var(--text)_12%,transparent)] overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${(user.streak / user.bestStreak) * 100}%` }}
-              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-              className="h-full grad-bg"
-            />
-          </div>
-          <p className="text-[11px] text-dim mt-2">Best: {user.bestStreak} days</p>
+          <button
+            onClick={signOut}
+            className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-lg py-2
+                       text-xs font-semibold text-dim hover:text-rose-600 dark:hover:text-rose-300
+                       bg-[color-mix(in_oklab,var(--text)_7%,transparent)] transition-colors cursor-pointer"
+          >
+            <LogOut size={13} /> Log out
+          </button>
         </div>
 
         <div className="flex items-center justify-between">
@@ -144,6 +163,15 @@ export function BottomNav({ active, onNavigate }) {
 /* ----------------------------------------------------------------- TopBar */
 
 export function TopBar({ title, subtitle, theme, onToggleTheme, onNavigate }) {
+  const { user, logout } = useAuth();
+  const toast = useToast();
+
+  const signOut = async () => {
+    await logout();
+    toast("Signed out", { type: "info", desc: "See you at the next session." });
+    onNavigate("landing");
+  };
+
   return (
     <header className="sticky top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3.5 mb-6
                        border-b border-[color-mix(in_oklab,var(--text)_8%,transparent)]
@@ -151,7 +179,7 @@ export function TopBar({ title, subtitle, theme, onToggleTheme, onNavigate }) {
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <div className="lg:hidden mb-0.5">
-            <button onClick={() => onNavigate("landing")} className="cursor-pointer">
+            <button onClick={() => onNavigate("dashboard")} className="cursor-pointer">
               <Logo size="sm" />
             </button>
           </div>
@@ -159,24 +187,34 @@ export function TopBar({ title, subtitle, theme, onToggleTheme, onNavigate }) {
           {subtitle && <p className="hidden lg:block text-xs text-dim mt-0.5 truncate">{subtitle}</p>}
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1.5
-                          bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]
-                          border border-[color-mix(in_oklab,var(--accent)_28%,transparent)]">
-            <Sparkles size={13} className="text-[var(--accent)]" />
-            <span className="text-[11px] font-semibold text-[var(--accent)]">{user.membership}</span>
-          </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <span className="hidden sm:block text-sm font-semibold truncate max-w-[160px]">
+            {user?.fullName}
+          </span>
+
           <div className="lg:hidden">
             <ThemeToggle theme={theme} onToggle={onToggleTheme} compact />
           </div>
+
           <button
             onClick={() => onNavigate("profile")}
             className="relative grid place-items-center h-9 w-9 rounded-full grad-bg text-[#07090d]
                        font-display font-bold text-xs cursor-pointer hover:brightness-110 transition"
             aria-label="Open profile"
           >
-            {user.initials}
+            {initialsOf(user?.fullName)}
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[var(--bg)]" />
+          </button>
+
+          <button
+            onClick={signOut}
+            aria-label="Log out"
+            title="Log out"
+            className="grid place-items-center h-9 w-9 rounded-full transition-colors cursor-pointer
+                       text-dim hover:text-rose-600 dark:hover:text-rose-300
+                       bg-[color-mix(in_oklab,var(--text)_7%,transparent)]"
+          >
+            <LogOut size={15} />
           </button>
         </div>
       </div>
