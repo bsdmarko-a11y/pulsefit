@@ -23,6 +23,7 @@
   --text-dim: #93a1ad;
   --accent: #bef264;
   --accent-2: #22d3ee;
+  --accent-text: #bef264;
   --shadow: 0 24px 60px -24px rgb(0 0 0 / 0.85);
   color-scheme: dark;
 }
@@ -37,6 +38,7 @@
   --text-dim: #5a6775;
   --accent: #63b312;
   --accent-2: #0891b2;
+  --accent-text: #3d7a08;
   --shadow: 0 20px 50px -28px rgb(13 18 24 / 0.35);
   color-scheme: light;
 }

@@ -46,7 +46,7 @@ export default function Profile({ onNavigate, theme, onToggleTheme }) {
   };
 
   const stats = [
-    { v: lifetime.workouts, l: "Workouts", s: "", icon: Dumbbell, tone: "text-[var(--accent)]" },
+    { v: lifetime.workouts, l: "Workouts", s: "", icon: Dumbbell, tone: "text-[var(--accent-text)]" },
     { v: Math.round(lifetime.minutes / 60), l: "Hours trained", s: "h", icon: Timer, tone: "text-cyan-700 dark:text-cyan-300" },
     { v: lifetime.minutes, l: "Active minutes", s: "", icon: Layers, tone: "text-violet-700 dark:text-violet-300" },
     { v: streak, l: "Day streak", s: "", icon: Flame, tone: "text-orange-600 dark:text-orange-400" },

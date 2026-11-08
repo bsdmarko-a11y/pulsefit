@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { ToastProvider, Logo } from "./components/ui.jsx";
@@ -6,10 +6,13 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { Sidebar, BottomNav, TopBar } from "./components/Shell.jsx";
 import Landing from "./screens/Landing.jsx";
 import { Login, Signup } from "./screens/Auth.jsx";
-import Dashboard from "./screens/Dashboard.jsx";
 import Library from "./screens/Library.jsx";
 import LiveWorkout from "./screens/LiveWorkout.jsx";
-import Progress from "./screens/Progress.jsx";
+
+// Recharts is the single biggest dependency and only these two screens use
+// it, so they load on demand instead of in the landing-page bundle.
+const Dashboard = lazy(() => import("./screens/Dashboard.jsx"));
+const Progress = lazy(() => import("./screens/Progress.jsx"));
 import Classes from "./screens/Classes.jsx";
 import Profile from "./screens/Profile.jsx";
 
@@ -58,6 +61,15 @@ function Booting() {
   );
 }
 
+/** Shown for the moment a lazily-loaded screen's chunk is in flight. */
+function ScreenFallback() {
+  return (
+    <div className="py-24 grid place-items-center">
+      <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
+    </div>
+  );
+}
+
 function Router() {
   const { user, loading } = useAuth();
   const [route, setRoute] = useState("landing");
@@ -91,10 +103,18 @@ function Router() {
 
   const meta = TITLES[route] ?? TITLES.dashboard;
   const screens = {
-    dashboard: <Dashboard key="dashboard" onNavigate={navigate} />,
+    dashboard: (
+      <Suspense key="dashboard" fallback={<ScreenFallback />}>
+        <Dashboard onNavigate={navigate} />
+      </Suspense>
+    ),
     library: <Library key="library" onNavigate={navigate} />,
     live: <LiveWorkout key="live" onNavigate={navigate} />,
-    progress: <Progress key="progress" />,
+    progress: (
+      <Suspense key="progress" fallback={<ScreenFallback />}>
+        <Progress />
+      </Suspense>
+    ),
     classes: <Classes key="classes" />,
     profile: <Profile key="profile" onNavigate={navigate} theme={theme} onToggleTheme={toggleTheme} />,
   };

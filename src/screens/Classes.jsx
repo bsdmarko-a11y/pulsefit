@@ -110,7 +110,7 @@ export default function Classes() {
                   {perDay[d] ?? 0}
                 </span>
                 {i === todayIdx && (
-                  <span className={`block text-[9px] font-semibold mt-0.5 ${on ? "opacity-70" : "text-[var(--accent)]"}`}>
+                  <span className={`block text-[9px] font-semibold mt-0.5 ${on ? "opacity-70" : "text-[var(--accent-text)]"}`}>
                     TODAY
                   </span>
                 )}
@@ -195,7 +195,7 @@ export default function Classes() {
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-xs">
                         <Users size={14} className="text-dim" />
-                        <strong className={spots === 0 ? "text-rose-600 dark:text-rose-300" : "text-[var(--accent)]"}>
+                        <strong className={spots === 0 ? "text-rose-600 dark:text-rose-300" : "text-[var(--accent-text)]"}>
                           {spots === 0 ? "Full" : `${spots} left`}
                         </strong>
                       </span>
@@ -236,7 +236,7 @@ export default function Classes() {
 
       <div className="mt-8 glass rounded-2xl p-5 flex items-center gap-4">
         <div className="grid place-items-center h-10 w-10 rounded-xl bg-[color-mix(in_oklab,var(--accent)_13%,transparent)] shrink-0">
-          <CalendarDays size={18} className="text-[var(--accent)]" />
+          <CalendarDays size={18} className="text-[var(--accent-text)]" />
         </div>
         <p className="text-sm text-dim">
           The timetable comes from the database. Bookings are not stored yet, so they reset on refresh.

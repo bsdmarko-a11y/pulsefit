@@ -149,7 +149,7 @@ export function BottomNav({ active, onNavigate }) {
               <Icon
                 size={19}
                 strokeWidth={on ? 2.6 : 2}
-                className={on ? "text-[var(--accent)]" : "text-dim"}
+                className={on ? "text-[var(--accent-text)]" : "text-dim"}
               />
               <span className={`text-[10px] font-medium ${on ? "text-[var(--text)]" : "text-dim"}`}>{label}</span>
             </button>

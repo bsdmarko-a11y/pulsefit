@@ -9,6 +9,7 @@ import {
   GlassCard, Badge, SectionHeading, AnimatedCounter, Page, stagger, riseIn,
 } from "../components/ui.jsx";
 import { strengthProgress, bodyMetrics, personalRecords, user } from "../data/mockData.js";
+import { useChartPalette } from "../lib/useChartPalette.js";
 
 const TIER = {
   gold: { ring: "from-amber-300 to-yellow-500", text: "text-amber-600 dark:text-amber-300", icon: Trophy },
@@ -34,13 +35,15 @@ function Tip({ active, payload, label, unit = "kg" }) {
 
 export default function Progress() {
   const [metric, setMetric] = useState("weight");
+  const palette = useChartPalette();
 
   const first = strengthProgress[0];
   const last = strengthProgress[strengthProgress.length - 1];
+  // Colours come from the palette so the figures stay readable in light mode.
   const gains = [
-    { lift: "Bench", from: first.bench, to: last.bench, color: "#bef264" },
-    { lift: "Squat", from: first.squat, to: last.squat, color: "#22d3ee" },
-    { lift: "Deadlift", from: first.deadlift, to: last.deadlift, color: "#a78bfa" },
+    { lift: "Bench", from: first.bench, to: last.bench, color: palette.bench },
+    { lift: "Squat", from: first.squat, to: last.squat, color: palette.squat },
+    { lift: "Deadlift", from: first.deadlift, to: last.deadlift, color: palette.deadlift },
   ];
 
   return (
@@ -96,9 +99,9 @@ export default function Progress() {
                   <Tooltip content={<Tip />} />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} iconType="circle" />
                   {[
-                    { k: "bench", c: "#bef264" },
-                    { k: "squat", c: "#22d3ee" },
-                    { k: "deadlift", c: "#a78bfa" },
+                    { k: "bench", c: palette.bench },
+                    { k: "squat", c: palette.squat },
+                    { k: "deadlift", c: palette.deadlift },
                   ].map(({ k, c }, i) => (
                     <Line
                       key={k}
@@ -151,8 +154,8 @@ export default function Progress() {
                 <AreaChart data={bodyMetrics} margin={{ top: 8, right: 10, bottom: 0, left: -16 }}>
                   <defs>
                     <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.55} />
-                      <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.02} />
+                      <stop offset="0%" stopColor={palette.area} stopOpacity={0.55} />
+                      <stop offset="100%" stopColor={palette.area} stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 6" stroke="currentColor" className="text-dim" opacity={0.15} vertical={false} />
@@ -162,10 +165,10 @@ export default function Progress() {
                   <Area
                     type="monotone"
                     dataKey={metric}
-                    stroke="#22d3ee"
+                    stroke={palette.area}
                     strokeWidth={2.75}
                     fill="url(#areaGrad)"
-                    dot={{ r: 3.5, fill: "#22d3ee", strokeWidth: 0 }}
+                    dot={{ r: 3.5, fill: palette.area, strokeWidth: 0 }}
                     activeDot={{ r: 6, strokeWidth: 2, stroke: "var(--bg)" }}
                     animationDuration={1300}
                   />
@@ -211,7 +214,7 @@ export default function Progress() {
                       <div className="text-[11px] text-dim mt-0.5">{pr.date}</div>
                     </div>
                     <div className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold
-                                     ${improved ? "text-[var(--accent)]" : "text-rose-600 dark:text-rose-300"}`}>
+                                     ${improved ? "text-[var(--accent-text)]" : "text-rose-600 dark:text-rose-300"}`}>
                       {improved ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
                       {pr.delta > 0 ? "+" : ""}{pr.delta}
                     </div>

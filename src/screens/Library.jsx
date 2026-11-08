@@ -142,7 +142,7 @@ export default function Library({ onNavigate }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="grid place-items-center h-10 w-10 rounded-xl shrink-0
                                       bg-[color-mix(in_oklab,var(--accent)_13%,transparent)]">
-                        <Dumbbell size={17} className="text-[var(--accent)]" />
+                        <Dumbbell size={17} className="text-[var(--accent-text)]" />
                       </div>
                       <DifficultyPill level={ex.difficulty} />
                     </div>

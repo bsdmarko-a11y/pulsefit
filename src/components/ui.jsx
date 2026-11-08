@@ -54,7 +54,7 @@ export function Button({
     primary:
       "grad-bg text-[#06080b] font-semibold shadow-[0_10px_34px_-12px_color-mix(in_oklab,var(--accent)_80%,transparent)] hover:brightness-110",
     ghost:
-      "bg-transparent border border-[color-mix(in_oklab,var(--text)_16%,transparent)] hover:border-[color-mix(in_oklab,var(--accent)_55%,transparent)] hover:text-[var(--accent)]",
+      "bg-transparent border border-[color-mix(in_oklab,var(--text)_16%,transparent)] hover:border-[color-mix(in_oklab,var(--accent)_55%,transparent)] hover:text-[var(--accent-text)]",
     soft:
       "bg-[color-mix(in_oklab,var(--text)_8%,transparent)] hover:bg-[color-mix(in_oklab,var(--accent)_18%,transparent)]",
     danger:
@@ -188,7 +188,7 @@ export function ProgressRing({
 export function Badge({ children, tone = "neutral", className = "" }) {
   const tones = {
     neutral: "bg-[color-mix(in_oklab,var(--text)_9%,transparent)] text-dim",
-    accent: "bg-[color-mix(in_oklab,var(--accent)_18%,transparent)] text-[var(--accent)] border border-[color-mix(in_oklab,var(--accent)_32%,transparent)]",
+    accent: "bg-[color-mix(in_oklab,var(--accent)_18%,transparent)] text-[var(--accent-text)] border border-[color-mix(in_oklab,var(--accent)_38%,transparent)]",
     cyan: "bg-cyan-400/12 text-cyan-700 dark:text-cyan-300 border border-cyan-400/25",
     amber: "bg-amber-400/12 text-amber-600 dark:text-amber-300 border border-amber-400/25",
     rose: "bg-rose-400/12 text-rose-600 dark:text-rose-300 border border-rose-400/25",
@@ -233,7 +233,7 @@ export function EmptyState({ icon: Icon, title, message, action }) {
       className="glass rounded-2xl py-14 px-6 text-center"
     >
       <div className="mx-auto mb-4 grid place-items-center w-14 h-14 rounded-2xl bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]">
-        {Icon && <Icon size={24} className="text-[var(--accent)]" />}
+        {Icon && <Icon size={24} className="text-[var(--accent-text)]" />}
       </div>
       <h3 className="font-display text-lg font-semibold">{title}</h3>
       <p className="text-dim text-sm mt-1.5 max-w-sm mx-auto">{message}</p>
@@ -249,7 +249,7 @@ export const useToast = () => useContext(ToastCtx);
 
 const TOAST_ICON = { success: CheckCircle2, error: AlertTriangle, info: Info };
 const TOAST_TONE = {
-  success: "text-[var(--accent)] border-[color-mix(in_oklab,var(--accent)_38%,transparent)]",
+  success: "text-[var(--accent-text)] border-[color-mix(in_oklab,var(--accent)_38%,transparent)]",
   error: "text-rose-600 dark:text-rose-300 border-rose-400/35",
   info: "text-cyan-700 dark:text-cyan-300 border-cyan-400/35",
 };

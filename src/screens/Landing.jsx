@@ -43,7 +43,6 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
           <nav className="hidden md:flex items-center gap-7 text-sm text-dim">
             <a href="#how" className="hover:text-[var(--text)] transition-colors">Features</a>
             <a href="#stats" className="hover:text-[var(--text)] transition-colors">Results</a>
-            <a href="#how" className="hover:text-[var(--text)] transition-colors">How it works</a>
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle theme={theme} onToggle={onToggleTheme} compact />
@@ -74,7 +73,7 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
               <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] animate-pulse-ring" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]" />
             </span>
-            <span className="text-xs font-semibold text-[var(--accent)]">
+            <span className="text-xs font-semibold text-[var(--accent-text)]">
               {statsLoading
                 ? "Loading this week's schedule"
                 : `${stats?.classesThisWeek ?? 0} classes running this week`}
@@ -106,7 +105,7 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
           <motion.div variants={riseIn} className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-dim">
             {["No equipment required to start", "Cancel anytime", "First 14 days free"].map((t) => (
               <span key={t} className="inline-flex items-center gap-1.5">
-                <Check size={13} className="text-[var(--accent)]" /> {t}
+                <Check size={13} className="text-[var(--accent-text)]" /> {t}
               </span>
             ))}
           </motion.div>
@@ -218,7 +217,7 @@ export default function Landing({ onNavigate, theme, onToggleTheme }) {
               <GlassCard className="p-6 h-full">
                 <div className="grid place-items-center h-11 w-11 rounded-xl
                                 bg-[color-mix(in_oklab,var(--accent)_15%,transparent)] mb-4">
-                  <f.icon size={20} className="text-[var(--accent)]" strokeWidth={2.2} />
+                  <f.icon size={20} className="text-[var(--accent-text)]" strokeWidth={2.2} />
                 </div>
                 <h3 className="font-display text-lg font-semibold">{f.title}</h3>
                 <p className="text-dim text-sm mt-2 leading-relaxed">{f.text}</p>

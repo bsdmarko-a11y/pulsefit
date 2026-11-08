@@ -14,6 +14,7 @@ import {
 } from "../components/states.jsx";
 import { api } from "../lib/api.js";
 import { quoteOfTheDay } from "../data/mockData.js";
+import { useChartPalette } from "../lib/useChartPalette.js";
 
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -26,6 +27,7 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 export default function Dashboard({ onNavigate }) {
+  const palette = useChartPalette();
   const { data, error, loading, reload } = useApiData((signal) => api.dashboard(signal), []);
 
   if (error) {
@@ -103,7 +105,7 @@ export default function Dashboard({ onNavigate }) {
 
                   <div className="flex flex-wrap gap-5 mt-5 text-sm">
                     <span className="inline-flex items-center gap-2">
-                      <Dumbbell size={16} className="text-[var(--accent)]" />
+                      <Dumbbell size={16} className="text-[var(--accent-text)]" />
                       <strong className="font-display">{todaysWorkout.exerciseCount}</strong>
                       <span className="text-dim">exercises</span>
                     </span>
@@ -195,8 +197,8 @@ export default function Dashboard({ onNavigate }) {
                     <BarChart data={weekly} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
                       <defs>
                         <linearGradient id="barGrad" x1="0" y1="1" x2="0" y2="0">
-                          <stop offset="0%" stopColor="#22d3ee" />
-                          <stop offset="100%" stopColor="#bef264" />
+                          <stop offset="0%" stopColor={palette.barFrom} />
+                          <stop offset="100%" stopColor={palette.barTo} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 6" stroke="currentColor" className="text-dim" opacity={0.15} vertical={false} />
@@ -240,7 +242,7 @@ export default function Dashboard({ onNavigate }) {
             </GlassCard>
 
             <GlassCard hover={false} className="p-6 flex-1">
-              <Quote size={18} className="text-[var(--accent)]" />
+              <Quote size={18} className="text-[var(--accent-text)]" />
               <p className="font-display text-base font-medium mt-3 leading-snug">“{quoteOfTheDay.text}”</p>
               <p className="text-xs text-dim mt-3">— {quoteOfTheDay.author}</p>
             </GlassCard>
@@ -267,7 +269,7 @@ export default function Dashboard({ onNavigate }) {
                   >
                     <div className="grid place-items-center h-10 w-10 rounded-xl shrink-0
                                     bg-[color-mix(in_oklab,var(--accent)_12%,transparent)]">
-                      <Dumbbell size={17} className="text-[var(--accent)]" />
+                      <Dumbbell size={17} className="text-[var(--accent-text)]" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold truncate">{s.name}</div>

@@ -55,7 +55,7 @@ function Shell({ title, subtitle, children, footer, onBack }) {
 }
 
 const linkClass =
-  "font-semibold text-[var(--accent)] hover:underline underline-offset-4 cursor-pointer";
+  "font-semibold text-[var(--accent-text)] hover:underline underline-offset-4 cursor-pointer";
 
 /* -------------------------------------------------------------------- Login */
 

@@ -334,7 +334,7 @@ export default function LiveWorkout({ onNavigate }) {
                   value: isComplete ? `${workout.durationMinutes}m` : fmt(elapsed),
                   tone: "text-cyan-700 dark:text-cyan-300",
                 },
-                { icon: Dumbbell, label: "Exercises", value: workout.exercises.length, tone: "text-[var(--accent)]" },
+                { icon: Dumbbell, label: "Exercises", value: workout.exercises.length, tone: "text-[var(--accent-text)]" },
                 { icon: Check, label: "Sets done", value: doneSets, tone: "text-amber-600 dark:text-amber-300" },
               ].map(({ icon: Icon, label, value, tone }) => (
                 <div key={label} className="rounded-xl p-3 text-center bg-[color-mix(in_oklab,var(--text)_6%,transparent)]">
@@ -376,7 +376,7 @@ export default function LiveWorkout({ onNavigate }) {
                         <span className="font-display text-xs font-bold text-dim">
                           {String(i + 1).padStart(2, "0")}
                         </span>
-                        <h3 className={`font-display text-lg font-semibold truncate ${finished ? "text-[var(--accent)]" : ""}`}>
+                        <h3 className={`font-display text-lg font-semibold truncate ${finished ? "text-[var(--accent-text)]" : ""}`}>
                           {ex.name}
                         </h3>
                       </div>
@@ -492,7 +492,7 @@ export default function LiveWorkout({ onNavigate }) {
                   { icon: Flame, v: workout.exercises.length, l: "Exercises" },
                 ].map(({ icon: Icon, v, l }) => (
                   <div key={l} className="rounded-xl p-3 bg-[color-mix(in_oklab,var(--text)_7%,transparent)]">
-                    <Icon size={15} className="mx-auto text-[var(--accent)]" />
+                    <Icon size={15} className="mx-auto text-[var(--accent-text)]" />
                     <div className="font-display font-bold mt-1.5 tabular-nums">{v}</div>
                     <div className="text-[10px] text-dim">{l}</div>
                   </div>
